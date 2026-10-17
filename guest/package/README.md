@@ -11,7 +11,8 @@ install running in the Mac app (see [the architecture](../../docs/architecture.m
 - first-boot language seeding and the Mac JIS 英数/かな keys;
 - SSH on demand;
 - root filesystem growth;
-- the Hyprland display and input profile for the VM;
+- the Hyprland display and input profile for the VM, and the Mac's camera
+  notch for Omarchy's bar ([camera notch](../../docs/camera-notch.md));
 - the guest status reporter and the integration package installer.
 
 ```sh
@@ -32,8 +33,11 @@ not ignore, so caches and other local files never reach the package.
   `/etc/systemd/sleep.conf.d/omarchy-sleep-disabled.conf` (a `backup` file;
   the System menu then hides Suspend and Hibernate, which a VM cannot wake
   from), `/etc/sudoers.d/try-omarchy-timezone` and
-  `/etc/profile.d/try-omarchy.sh`. Nothing goes
-  under `/usr/local`, `/usr/share/omarchy` or `/etc/skel`. Customisation uses
+  `/etc/profile.d/try-omarchy.sh`, and one link in Omarchy's platform root,
+  `/usr/share/omarchy-platform/display-cutouts.json`, to this boot's
+  `/run/try-omarchy/display-cutouts.json` (plain `aarch64` has no platform
+  package). Nothing goes under `/usr/local`, `/usr/share/omarchy` or
+  `/etc/skel`. Customisation uses
   systemd drop-ins, presets and udev rules, rows in the user's Omarchy menu
   extension, plus one loader in the user's Omarchy toggles directory.
 - **No kernel command line from the host.** The guest owns its boot. The app

@@ -59,6 +59,13 @@ enum HostDisplayCutouts {
         return defaults.string(forKey: defaultsKey) ?? ""
     }
 
+    /// Whether this Mac's built-in panel has a camera notch: measured now, or
+    /// measured before (the lid may be closed while the launcher shows).
+    @MainActor
+    static func macHasNotch(defaults: UserDefaults = .standard) -> Bool {
+        measure() != nil || !(defaults.string(forKey: defaultsKey) ?? "").isEmpty
+    }
+
     @MainActor
     private static func measure() -> [HostDisplayCutout]? {
         let builtin = NSScreen.screens.first { screen in

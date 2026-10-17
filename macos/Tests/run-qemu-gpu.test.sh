@@ -179,6 +179,13 @@ assert_contains "$output" "host settings: omarchy.qemu_virgl=1"
 assert_not_contains "$output" "tryomarchy.display_cutouts"
 output=$(TRYOMARCHY_NOTCH=0 launch)
 assert_not_contains "$output" "tryomarchy.display_cutouts"
+# The launcher's Camera notch setting, off.
+output=$(OMARCHY_QEMU_GPU_NOTCH=0 launch)
+assert_not_contains "$output" "tryomarchy.display_cutouts"
+output=$(OMARCHY_QEMU_GPU_NOTCH=1 launch)
+assert_contains "$output" "tryomarchy.display_cutouts=3024x1964:64,2048x1330:44"
+output=$(OMARCHY_QEMU_GPU_NOTCH=yes launch) && fail "an invalid notch setting launched"
+assert_contains "$output" "OMARCHY_QEMU_GPU_NOTCH must be 0 or 1"
 output=$(FAKE_DISPLAY_CUTOUTS='3024x1964:64 tryomarchy.ssh_from=any' launch)
 assert_contains "$output" "ignoring unexpected display cutouts"
 assert_not_contains "$(grep "host settings:" <<<"$output")" "tryomarchy.display_cutouts"

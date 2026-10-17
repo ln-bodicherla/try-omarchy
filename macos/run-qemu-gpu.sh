@@ -248,8 +248,15 @@ export TRYOMARCHY_KEYBOARD=$keyboard
 # The camera housing of the Mac's built-in panel, one WIDTHxHEIGHT:TOP per
 # display mode in pixels: QEMU's full screen covers the strip beside it, and
 # the guest describes it to Omarchy's bar. Nothing on a Mac without a notch,
-# or with TRYOMARCHY_NOTCH=0 (full screen then stays below the housing). The
-# notch is cosmetic, so a failed probe only leaves it out.
+# or with the launcher's Camera notch setting off (OMARCHY_QEMU_GPU_NOTCH=0):
+# full screen then stays below the housing, which QEMU reads as
+# TRYOMARCHY_NOTCH=0. The notch is cosmetic, so a failed probe only leaves it
+# out.
+case ${OMARCHY_QEMU_GPU_NOTCH:-1} in
+  1) ;;
+  0) export TRYOMARCHY_NOTCH=0 ;;
+  *) fail "OMARCHY_QEMU_GPU_NOTCH must be 0 or 1" ;;
+esac
 if [[ ${TRYOMARCHY_NOTCH:-1} != 0 ]]; then
   display_cutouts=$("$native_bridge" --host-display-cutouts 2>/dev/null) || display_cutouts=
   if [[ $display_cutouts =~ ^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}:[1-9][0-9]{0,3}(,[1-9][0-9]{0,4}x[1-9][0-9]{0,4}:[1-9][0-9]{0,3}){0,63}$ ]]; then
