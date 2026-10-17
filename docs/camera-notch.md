@@ -87,6 +87,10 @@ for QEMU's `Virtual-1` output:
 ] }
 ```
 
+An existing VM gets this package from the app at its next boot, after the
+old `host-config` has already run; the upgrade runs the new one again, before
+the desktop starts, so that boot has the cutouts too.
+
 The package links `/usr/share/omarchy-platform/display-cutouts.json`, the
 fixed path Omarchy's bar reads, to that file. Plain `aarch64` registers no
 platform package, so this one link is the package's only file in Omarchy's

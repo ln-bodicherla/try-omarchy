@@ -568,6 +568,30 @@ class Power(unittest.TestCase):
         self.assertIn("_enable_ntp", post_install)
         self.assertIn('if [ "$(vercmp "$2" 0.1.0-13)" -lt 0 ]; then\n    _enable_ntp', post_upgrade)
 
+    def test_upgrade_from_before_the_cutouts_reruns_host_config(self):
+        # The boot that upgrades an older VM ran the old host-config, which
+        # wrote no cutouts; the desktop starts after the upgrade.
+        with tempfile.TemporaryDirectory() as directory:
+            tmp = Path(directory)
+            log = tmp / "calls"
+            (tmp / "systemctl").write_text('#!/bin/bash\nprintf "%s\\n" "$*" >>"$TEST_LOG"\n')
+            (tmp / "vercmp").write_text('#!/usr/bin/python3\nimport re, sys\n'
+                                        'a, b = (tuple(map(int, re.split(r"[.-]", v))) for v in sys.argv[1:3])\n'
+                                        'print((a > b) - (a < b))\n')
+            for tool in ("systemctl", "vercmp"):
+                (tmp / tool).chmod(0o755)
+            for old, restarted in (("0.1.0-22", True), ("0.1.0-23", False)):
+                log.write_text("")
+                subprocess.run(["/bin/bash", "-c", 'source "$1"; post_upgrade 0.1.0-24 "$2"', "bash",
+                                str(PACKAGE / "try-omarchy.install"), old], check=True, env={
+                    **os.environ, "PATH": f"{tmp}:{os.environ['PATH']}", "TEST_LOG": str(log)})
+                self.assertEqual("try-restart try-omarchy-host-config.service" in log.read_text().splitlines(),
+                                 restarted, old)
+        unit = (PACKAGE / "files/usr/lib/systemd/system/try-omarchy-host-config.service").read_text()
+        self.assertIn("RemainAfterExit=yes", unit)
+        install = (PACKAGE / "files/usr/lib/systemd/system/try-omarchy-package-install.service").read_text()
+        self.assertIn("Before=display-manager.service", install)
+
 
 class ScreenRecording(unittest.TestCase):
     def test_wf_recorder_is_the_fallback_for_virgl(self):
