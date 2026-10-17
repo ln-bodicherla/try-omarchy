@@ -55,6 +55,7 @@ if sys.argv[1] == "runtime":
 ''')
         builder = self.root / "macos/build-app.sh"
         builder.write_text(f'#!{sys.executable}\n' + '''
+import json
 import os
 from pathlib import Path
 import plistlib
@@ -80,6 +81,16 @@ if os.environ.get("WRONG_APP_VERSION"):
 if os.environ.get("FAIL_PACKAGE"):
     sys.exit(24)
 (out / os.environ.get("DMG_NAME", "TryOmarchy.dmg")).write_text("test DMG\\n")
+tag = plistlib.loads(plist.read_bytes())["TryOmarchyBuildDescribe"]
+part = out / "factory/omarchy-aarch64-edge.img.zst.001"
+part.parent.mkdir(exist_ok=True)
+part.write_text("image")
+url = f"https://github.com/omacom/try-omarchy/releases/download/{tag}/{part.name}"
+if os.environ.get("WRONG_FACTORY_URL"):
+    url = url.replace(tag, "v0.0.1")
+manifest = app / "Contents/Resources/guest/download.json"
+manifest.parent.mkdir(parents=True, exist_ok=True)
+manifest.write_text(json.dumps({"parts": [{"url": url, "bytes": 5}]}))
 ''')
         builder.chmod(0o755)
         self.git("init", "-q")
@@ -138,9 +149,13 @@ if os.environ.get("FAIL_PACKAGE"):
         app_info = plistlib.loads((self.root / "dist/release.noindex/Try Omarchy.app/Contents/Info.plist").read_bytes())
         self.assertEqual("1.2.3", app_info["CFBundleShortVersionString"])
         self.assertEqual("v1.2.3", app_info["TryOmarchyBuildDescribe"])
-        self.assertIn("git push origin v1.2.3", result.stdout)
+        self.assertIn("run make publish", result.stdout)
         self.assertNotIn("[y/N]", result.stdout)
         self.assertEqual("", self.git("status", "--porcelain"))
+
+    def test_release_factory_download_points_at_its_own_assets(self) -> None:
+        result = self.run_release(WRONG_FACTORY_URL="1")
+        self.assert_failed(result, "the factory download does not point at v1.2.3")
 
     def test_release_requires_stable_dmg(self) -> None:
         for name in ("TryOmarchy-v1.2.3.dmg", "TryOmarchy-v1.2.2.dmg"):
