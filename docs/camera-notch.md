@@ -109,6 +109,26 @@ Omarchy's usual bar. Changing the Mac's resolution changes the mode to
 another entry. The bar reads the file at the shell's start and whenever it
 changes.
 
+### Keeping the bar's mode current
+
+Omarchy's bar takes a screen's mode from Quickshell's Hyprland monitor
+objects, which Quickshell reads again only when an output comes or goes, on a
+config reload, or when one of Omarchy's overlays (a menu, the OSD) opens. On a
+MacBook the mode never changes under the bar, but a VM's does, every time the
+window enters or leaves full screen, and the mode `omarchy-native-display-sync`
+sets brings none of those events. Left alone, the bar keeps the previous
+mode's layout: in a window, the clock beside the right section; back in full
+screen, a normal bar with the clock under the camera.
+
+So `omarchy-native-display-sync` passes each mode it applies to
+`/usr/lib/try-omarchy/notch-refresh`. When the mode enters, leaves or moves
+between the cutouts' modes, it creates a headless output and removes it at
+once, which makes Quickshell read every monitor again. A window being resized
+and a Mac without a notch never trigger it. The lasting fix belongs in
+Omarchy's bar: refresh Hyprland's monitors when a bar's screen changes size,
+as its overlays already do for scale changes. Tested in the VM, that fix alone
+keeps the bar right on every change, and `notch-refresh` can then go.
+
 ## Limits
 
 - Omarchy knows the housing's height, not where it is across the panel. A
@@ -119,14 +139,10 @@ changes.
 - Real full screen (`Super + F`) and the hidden bar (`Super + Shift + Space`)
   give the strip to the window or the wallpaper, behind the camera, as on a
   MacBook running Omarchy natively.
-- Omarchy's bar reads a screen's mode from Quickshell's Hyprland monitor
-  objects, which Quickshell refreshes on monitor hotplug, a config reload, or
-  when one of Omarchy's overlays (a menu, the OSD) shows. A VM's mode changes
-  with none of those, so after some window, full-screen or resolution changes
-  the bar keeps the previous mode's layout until the next overlay. A bare
-  MacBook never changes modes this way. The fix belongs in Omarchy's bar:
-  refresh Hyprland's monitors when a bar's screen changes size. Tested in the
-  VM: with it, every mode change gets the right bar.
+- With **Immersive** off, the window steps down under macOS's menu bar and
+  Dock while they are out. The menu bar's black strip then covers Omarchy's
+  bar until the pointer moves on; only a private SkyLight call could make
+  that strip see-through.
 - Omarchy reads cutouts from about October 2026 on (`omarchy-dev` built from
   `quattro`). An older guest shows its usual bar in the strip, partly under
   the housing, until `omarchy update`.

@@ -190,6 +190,59 @@ class HostConfig(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
 
+class NotchRefresh(unittest.TestCase):
+    """notch-refresh nudges Quickshell only when the cutout's answer can change."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.cutouts = self.tmp / "display-cutouts.json"
+        self.log = self.tmp / "hyprctl.log"
+        shims = self.tmp / "bin"
+        shims.mkdir()
+        (shims / "hyprctl").write_text('#!/bin/bash\necho "$*" >>"$HYPRCTL_LOG"\n')
+        (shims / "hyprctl").chmod(0o755)
+        self.env = {"PATH": f"{shims}:{os.environ['PATH']}", "HYPRCTL_LOG": str(self.log),
+                    "TRY_OMARCHY_DISPLAY_CUTOUTS": str(self.cutouts),
+                    "TRY_OMARCHY_NOTCH_STATE": str(self.tmp / "state/notch-mode")}
+
+    def nudges(self, mode):
+        before = self.log.read_text().count("create") if self.log.exists() else 0
+        run(LIB / "notch-refresh", mode, env=self.env)
+        return self.log.read_text().count("create") - before if self.log.exists() else 0
+
+    def test_only_entering_leaving_or_changing_a_notch_mode_nudges(self):
+        (self.credentials_dir() / "tryomarchy.host").write_text(
+            "tryomarchy.display_cutouts=3600x2338:77,3024x1964:64\n")
+        run(LIB / "host-config", env={"CREDENTIALS_DIRECTORY": str(self.credentials_dir()),
+                                     "TRY_OMARCHY_HOST_CONFIG_OUTPUT": str(self.tmp / "cmdline"),
+                                     "TRY_OMARCHY_DISPLAY_CUTOUTS_OUTPUT": str(self.cutouts)})
+        self.assertEqual(self.nudges("1940x1260"), 0)   # a window at first
+        self.assertEqual(self.nudges("3024x1964"), 1)   # full screen covers the notch
+        self.assertEqual(self.nudges("3024x1964"), 0)   # nothing changed
+        self.assertEqual(self.nudges("3600x2338"), 1)   # another resolution
+        self.assertEqual(self.nudges("1940x1260"), 1)   # back to a window
+        self.assertEqual(self.nudges("1800x1100"), 0)   # a window resized
+        self.assertEqual(self.log.read_text().splitlines()[-2:],
+                         ["output create headless TRYOMARCHY-REFRESH", "output remove TRYOMARCHY-REFRESH"])
+
+    def test_a_mac_without_a_notch_or_a_bad_mode_does_nothing(self):
+        self.assertEqual(self.nudges("3024x1964"), 0)
+        result = run(LIB / "notch-refresh", "3024x1964;reboot", env=self.env, check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(self.log.exists())
+
+    def test_display_sync_passes_each_applied_mode(self):
+        sync = (FILES / "usr/bin/omarchy-native-display-sync").read_text()
+        self.assertIn('"$notch_refresh" "${width}x$height" || true', sync)
+        # Only after Hyprland accepted the mode.
+        self.assertLess(sync.index('elif [[ $response != ok ]]'), sync.index('"$notch_refresh"'))
+
+    def credentials_dir(self):
+        path = self.tmp / "credentials"
+        path.mkdir(exist_ok=True)
+        return path
+
+
 class SshAccess(unittest.TestCase):
     def check(self, options):
         tmp = Path(tempfile.mkdtemp())
