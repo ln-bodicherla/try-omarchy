@@ -43,6 +43,17 @@ class PackageLayout(unittest.TestCase):
             for forbidden in ("usr/share/omarchy/", "etc/skel/", "usr/share/omarchy-platform/"):
                 self.assertFalse(relative.startswith(forbidden), relative)
 
+    def test_platform_root_holds_only_the_camera_cutouts_link(self):
+        # Generic aarch64 registers no platform package; the one file the VM
+        # adds to Omarchy's platform root points at this boot's cutouts.
+        lines = [line.strip() for line in (PACKAGE / "PKGBUILD").read_text().splitlines()
+                 if "omarchy-platform" in line and not line.strip().startswith("#")]
+        self.assertEqual(lines, [
+            'install -d "$pkgdir/usr/share/omarchy-platform"',
+            'ln -s /run/try-omarchy/display-cutouts.json "$pkgdir/usr/share/omarchy-platform/display-cutouts.json"',
+        ])
+        self.assertIn("/run/try-omarchy/display-cutouts.json", (LIB / "host-config").read_text())
+
     def test_executables(self):
         for directory in ("usr/bin", "usr/lib/try-omarchy", "usr/lib/try-omarchy/shims", "usr/lib/try-omarchy/bin"):
             for path in (FILES / directory).iterdir():
@@ -131,7 +142,9 @@ class HostConfig(unittest.TestCase):
         self.credentials = self.tmp / "credentials"
         self.credentials.mkdir()
         self.output = self.tmp / "run/try-omarchy/cmdline"
-        self.env = {"CREDENTIALS_DIRECTORY": str(self.credentials), "TRY_OMARCHY_HOST_CONFIG_OUTPUT": str(self.output)}
+        self.cutouts = self.tmp / "run/try-omarchy/display-cutouts.json"
+        self.env = {"CREDENTIALS_DIRECTORY": str(self.credentials), "TRY_OMARCHY_HOST_CONFIG_OUTPUT": str(self.output),
+                    "TRY_OMARCHY_DISPLAY_CUTOUTS_OUTPUT": str(self.cutouts)}
 
     def test_publishes_tokens(self):
         (self.credentials / "tryomarchy.host").write_text("omarchy.qemu_virgl=1 tryomarchy.keyboard=jis\n")
@@ -142,6 +155,32 @@ class HostConfig(unittest.TestCase):
     def test_without_credential_writes_nothing(self):
         run(LIB / "host-config", env=self.env)
         self.assertFalse(self.output.exists())
+        self.assertFalse(self.cutouts.exists())
+
+    def test_describes_the_macs_camera_housing_to_omarchy(self):
+        (self.credentials / "tryomarchy.host").write_text(
+            "omarchy.qemu_virgl=1 tryomarchy.display_cutouts=3024x1964:64,2048x1330:44 tryomarchy.keyboard=ansi\n")
+        run(LIB / "host-config", env=self.env)
+        # The schema Omarchy's bar parses (BarModel.parseCutouts): QEMU's
+        # first output, every panel mode with the housing in physical pixels.
+        self.assertEqual(json.loads(self.cutouts.read_text()), {"panels": [
+            {"connector": "Virtual-1", "width": 3024, "height": 1964, "top": 64},
+            {"connector": "Virtual-1", "width": 2048, "height": 1330, "top": 44},
+        ]})
+        self.assertEqual(stat.S_IMODE(self.cutouts.stat().st_mode), 0o644)
+
+    def test_no_housing_or_a_malformed_one_describes_none(self):
+        self.cutouts.parent.mkdir(parents=True)
+        for value in ("tryomarchy.keyboard=ansi",
+                      "tryomarchy.display_cutouts=3024x1964:64,",
+                      "tryomarchy.display_cutouts=3024x1964:0",
+                      'tryomarchy.display_cutouts=3024x1964:64"}]',
+                      "tryomarchy.display_cutouts=3024x1964"):
+            self.cutouts.write_text("stale\n")
+            (self.credentials / "tryomarchy.host").write_text(value + "\n")
+            run(LIB / "host-config", env=self.env)
+            self.assertFalse(self.cutouts.exists(), value)
+            self.assertEqual(self.output.read_text(), value + "\n")
 
     def test_rejects_control_characters_and_oversize(self):
         (self.credentials / "tryomarchy.host").write_bytes(b"a\x1bb")
