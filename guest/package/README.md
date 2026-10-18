@@ -160,7 +160,9 @@ the factory build does and every kernel update does.
 `/etc/limine-entry-tool.d/50-try-omarchy-cpu.conf` adds `arm64.nosme`. The
 M4 reports SME without SVE, and QEMU under HVF cannot hide SME, so programs
 that run an SVE instruction outside streaming mode crash with SIGILL. Chips
-before the M4 have no SME. It takes effect the same way as the console.
+before the M4 have no SME. It takes effect the same way as the console, and
+the upgrade that adds it also rebuilds Limine's entries once on a guest that
+still shows SME, so existing M4 VMs pick it up at their next boot.
 
 ## Hyprland
 
