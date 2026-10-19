@@ -564,7 +564,7 @@ class Recipe(unittest.TestCase):
                 calls = [line for line in log.read_text().splitlines() if line.startswith("limine-update")]
                 self.assertEqual(calls, expected, (features, running, boot.name))
         install = (PACKAGE / "try-omarchy.install").read_text()
-        self.assertIn('if [ "$(vercmp "$2" 0.1.0-25)" -lt 0 ]; then\n    _hide_sme\n', install)
+        self.assertIn('if [ "$(vercmp "$2" 0.1.0-27)" -lt 0 ]; then\n    _hide_sme\n', install)
 
     def test_chromium_takes_input_methods(self):
         self.assertIn("--enable-wayland-ime", (FILES / "etc/chromium-flags.conf").read_text().split())
@@ -920,6 +920,13 @@ class Hyprland(unittest.TestCase):
         profile = (FILES / "usr/share/try-omarchy/hyprland.lua").read_text()
         handler = profile[profile.index('hl.on("window.destroy"'):]
         self.assertIn("invisible = true", handler[:200])
+
+    def test_italian_on_apple_models_is_current_qwerty(self):
+        # xkeyboard-config's Apple Italian is the old QZERTY layout, where M types
+        # a comma; guest/tests/package-install.sh compiles the keymaps.
+        symbols = (FILES / "etc/xkb/symbols/macintosh_vndr/it").read_text()
+        self.assertEqual(re.findall(r'^default\s+xkb_symbols "(\w+)"', symbols, re.M), ["basic"])
+        self.assertIn('include "it(basic)"', symbols)
 
 
 class AuthenticationState(unittest.TestCase):
